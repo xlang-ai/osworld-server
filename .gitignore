@@ -6,3 +6,5 @@ __pycache__/
 build/
 dist/
 main.exe
+
+osworld_server.egg-info/

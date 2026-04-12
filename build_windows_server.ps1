@@ -30,8 +30,9 @@ if ($SyncDir -ne "") {
         New-Item -ItemType Directory -Path $SyncDir -Force | Out-Null
         Copy-Item ".\main.exe" (Join-Path $SyncDir "main.exe") -Force
         Copy-Item ".\main.py" (Join-Path $SyncDir "main.py") -Force
-        Copy-Item ".\pyxcursor.py" (Join-Path $SyncDir "pyxcursor.py") -Force
+        Copy-Item ".\src" (Join-Path $SyncDir "src") -Recurse -Force
         Copy-Item ".\requirements.txt" (Join-Path $SyncDir "requirements.txt") -Force
+        Copy-Item ".\h264_browser_client.html" (Join-Path $SyncDir "h264_browser_client.html") -Force
     }
 }
 

@@ -53,7 +53,7 @@ powershell -ExecutionPolicy Bypass -File .\build_windows_server.ps1 -PythonExe p
 This command:
 1. installs dependencies,
 2. builds one-file `main.exe` with PyInstaller,
-3. syncs `main.exe/main.py/pyxcursor.py/requirements.txt` to the target folder.
+3. syncs `main.exe/main.py/src/requirements.txt` to the target folder.
 
 After build, restart your startup process/service that launches `C:\OSWorld\desktop_env\server\main.exe`.
 
@@ -308,7 +308,7 @@ sudo systemctl restart display-manager
 ### Set up the OSWorld server service in VM
 Upload the OSWorld server to the home directory (/home/user) of user (via scp or git clone).
 
-1. Copy the `main.py` and `pyxcursor.py` and  to the `/home/user-name` where the `user-name` is your username of the ubuntu, here we make it `user` as default. If you customize the path of placing these files in this step, you should change the parameters in the service file we will mention later accordingly.
+1. Copy `main.py` and the `src/` folder to `/home/user-name` where `user-name` is your username of the ubuntu, here we make it `user` as default. If you customize the path of placing these files in this step, you should change the parameters in the service file we will mention later accordingly.
 
 2. First please set up the environment:
 ```shell

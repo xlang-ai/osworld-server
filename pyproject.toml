@@ -28,7 +28,10 @@ dependencies = [
 osworld-server = "main:main"
 
 [tool.setuptools]
-py-modules = ["main", "pyxcursor"]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
 
 [tool.setuptools.package-data]
 "*" = ["h264_browser_client.html", "osworld_server.service", "build_windows_server.ps1"]
