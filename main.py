@@ -2750,7 +2750,12 @@ async def browser_h264_client():
 
 asgi_app.mount("/", WSGIMiddleware(app))
 
-if __name__ == '__main__':
+
+def main() -> None:
     host = os.environ.get("OSWORLD_SERVER_HOST", "0.0.0.0")
     port = int(os.environ.get("OSWORLD_SERVER_PORT", "5000"))
     uvicorn.run(asgi_app, host=host, port=port, log_level="info")
+
+
+if __name__ == '__main__':
+    main()

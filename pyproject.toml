@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "osworld-server"
+version = "0.1.0"
+description = "Standalone guest-side server for OSWorld desktop environments."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "python3-xlib==0.15",
+    "PyAutoGUI==0.9.54",
+    "Pillow==10.1.0",
+    "requests",
+    "flask",
+    "fastapi",
+    "uvicorn",
+    "websockets",
+    "numpy",
+    "lxml",
+    "pygame",
+    "pywinauto; platform_system == 'Windows'",
+    "pynput @ git+https://github.com/moses-palmer/pynput.git@refs/pull/541/head",
+]
+
+[project.scripts]
+osworld-server = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "pyxcursor"]
+
+[tool.setuptools.package-data]
+"*" = ["h264_browser_client.html", "osworld_server.service", "build_windows_server.ps1"]

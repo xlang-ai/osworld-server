@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.spec
+.pytest_cache/
+.venv/
+build/
+dist/
+main.exe

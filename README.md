@@ -2,6 +2,8 @@
 
 This README is useful if you want to set up your own machine for the environment. This README is not yet finished. Please contact the author if you need any assistance.
 
+This repository is intended to be usable on its own and can also be vendored into the main OSWorld repository as the `desktop_env/server` submodule.
+
 ## Configuration Overview
 
 The following sections contain guidelines for configuring the system image to ensure benchmark examples can run properly.
@@ -39,7 +41,7 @@ Detailed instructions for each of these requirements will be provided in the fol
 ## Windows Server Build (main.exe)
 
 If your Windows image runs `C:\OSWorld\desktop_env\server\main.exe`, build from this repo's
-`desktop_env/server/main.py` to keep runtime behavior aligned with V2.
+`main.py` to keep runtime behavior aligned with V2.
 
 In PowerShell on the Windows image:
 
@@ -311,7 +313,7 @@ Upload the OSWorld server to the home directory (/home/user) of user (via scp or
 2. First please set up the environment:
 ```shell
 sudo apt install python3
-pip3 install -r requirements.txt
+uv sync
 sudo apt-get install python3-tk python3-dev
 sudo apt install gnome-screenshot
 sudo apt install wmctrl
