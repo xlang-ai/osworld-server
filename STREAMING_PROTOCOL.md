@@ -44,7 +44,7 @@ Subsequent messages:
 
 Current limitation:
 
-- Implemented for Linux/X11 guests only
+- Implemented for Linux/X11 and Windows guests only
 
 ## `/ws/control`
 

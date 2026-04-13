@@ -3,7 +3,7 @@ import os
 import platform
 import subprocess
 from contextlib import contextmanager
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import Xlib
 from Xlib import X, display
@@ -121,6 +121,51 @@ def get_machine_architecture() -> str:
 
 def get_capture_display_name() -> str:
     return os.environ.get("DISPLAY", ":0.0")
+
+
+def build_ffmpeg_capture_input_args(
+    width: int,
+    height: int,
+    fps: float,
+    *,
+    draw_mouse: bool = True,
+) -> List[str]:
+    frame_rate = max(1, min(int(round(fps)), 60))
+    mouse_flag = "1" if draw_mouse else "0"
+
+    if platform_name == "Linux":
+        return [
+            "-f",
+            "x11grab",
+            "-draw_mouse",
+            mouse_flag,
+            "-video_size",
+            f"{width}x{height}",
+            "-framerate",
+            str(frame_rate),
+            "-i",
+            get_capture_display_name(),
+        ]
+
+    if platform_name == "Windows":
+        return [
+            "-f",
+            "gdigrab",
+            "-draw_mouse",
+            mouse_flag,
+            "-framerate",
+            str(frame_rate),
+            "-video_size",
+            f"{width}x{height}",
+            "-offset_x",
+            "0",
+            "-offset_y",
+            "0",
+            "-i",
+            "desktop",
+        ]
+
+    raise RuntimeError(f"FFmpeg screen capture is not implemented for platform: {platform_name}")
 
 
 def get_linux_screen_size() -> Tuple[int, int]:

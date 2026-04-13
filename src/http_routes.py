@@ -3,8 +3,8 @@ import io
 import os
 import platform
 import shlex
-import signal
 import subprocess
+import tempfile
 import time
 import traceback
 import uuid
@@ -20,14 +20,16 @@ from .accessibility import build_accessibility_tree, get_terminal_output
 from .capture import capture_screen_image, encode_image_bytes
 from .platform_runtime import (
     TIMEOUT,
+    build_ffmpeg_capture_input_args,
     get_machine_architecture,
     get_screen_size,
     managed_x_display,
     platform_name,
+    subprocess_creation_flags,
 )
 
 recording_process = None
-recording_path = "/tmp/recording.mp4"
+recording_path = str(Path(tempfile.gettempdir()) / "osworld-server-recording.mp4")
 
 
 def _append_event(*args, **kwargs) -> None:
@@ -673,20 +675,25 @@ def register_http_routes(app: Flask) -> None:
                 app.logger.error("Error removing old recording file: %s", exc)
                 return jsonify({"status": "error", "message": f"Failed to remove old recording file: {exc}"}), 500
 
-        with managed_x_display() as d:
-            screen_width = d.screen().width_in_pixels
-            screen_height = d.screen().height_in_pixels
-
-        start_command = (
-            f"ffmpeg -y -f x11grab -draw_mouse 1 -s {screen_width}x{screen_height} "
-            f"-i :0.0 -c:v libx264 -r 30 {recording_path}"
-        )
+        screen_width, screen_height = get_screen_size()
+        start_command = [
+            "ffmpeg",
+            "-y",
+            *build_ffmpeg_capture_input_args(screen_width, screen_height, 30, draw_mouse=True),
+            "-c:v",
+            "libx264",
+            "-r",
+            "30",
+            recording_path,
+        ]
 
         recording_process = subprocess.Popen(
-            shlex.split(start_command),
+            start_command,
+            stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
+            creationflags=subprocess_creation_flags(),
         )
 
         try:
@@ -711,10 +718,12 @@ def register_http_routes(app: Flask) -> None:
 
         error_output = ""
         try:
-            recording_process.send_signal(signal.SIGINT)
+            if recording_process.stdin is not None:
+                recording_process.stdin.write("q\n")
+                recording_process.stdin.flush()
             _, error_output = recording_process.communicate(timeout=15)
         except subprocess.TimeoutExpired:
-            app.logger.error("ffmpeg did not respond to SIGINT, killing the process.")
+            app.logger.error("ffmpeg did not exit after a graceful stop request, killing the process.")
             recording_process.kill()
             _, error_output = recording_process.communicate()
             recording_process = None
@@ -722,6 +731,17 @@ def register_http_routes(app: Flask) -> None:
                 {
                     "status": "error",
                     "message": f"Recording process was unresponsive and had to be killed. Stderr: {error_output}",
+                }
+            ), 500
+        except OSError as exc:
+            app.logger.error("Failed to send stop request to ffmpeg, killing the process. Error: %s", exc)
+            recording_process.kill()
+            _, error_output = recording_process.communicate()
+            recording_process = None
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": f"Failed to stop recording gracefully. Error: {exc}. Stderr: {error_output}",
                 }
             ), 500
 

@@ -21,9 +21,10 @@ from .capture import (
 from .platform_runtime import (
     DEFAULT_STREAM_FPS,
     DEFAULT_STREAM_QUALITY,
-    get_capture_display_name,
-    get_linux_screen_size,
+    build_ffmpeg_capture_input_args,
+    get_screen_size,
     platform_name,
+    subprocess_creation_flags,
 )
 
 
@@ -79,7 +80,6 @@ def build_h264_stream_command(
     frame_rate = max(1, min(int(round(fps)), 60))
     keyint = max(1, min(int(gop), 240))
     bitrate = max(250, min(int(bitrate_kbps), 12000))
-    display_name = get_capture_display_name()
 
     return [
         "ffmpeg",
@@ -88,16 +88,7 @@ def build_h264_stream_command(
         "-nostdin",
         "-fflags",
         "nobuffer",
-        "-f",
-        "x11grab",
-        "-draw_mouse",
-        "1",
-        "-video_size",
-        f"{width}x{height}",
-        "-framerate",
-        str(frame_rate),
-        "-i",
-        display_name,
+        *build_ffmpeg_capture_input_args(width, height, frame_rate, draw_mouse=True),
         "-an",
         "-c:v",
         "libx264",
@@ -141,7 +132,6 @@ def build_fmp4_stream_command(
     frame_rate = max(1, min(int(round(fps)), 60))
     keyint = max(1, min(int(gop), 240))
     bitrate = max(250, min(int(bitrate_kbps), 12000))
-    display_name = get_capture_display_name()
 
     return [
         "ffmpeg",
@@ -150,16 +140,7 @@ def build_fmp4_stream_command(
         "-nostdin",
         "-fflags",
         "nobuffer",
-        "-f",
-        "x11grab",
-        "-draw_mouse",
-        "1",
-        "-video_size",
-        f"{width}x{height}",
-        "-framerate",
-        str(frame_rate),
-        "-i",
-        display_name,
+        *build_ffmpeg_capture_input_args(width, height, frame_rate, draw_mouse=True),
         "-an",
         "-c:v",
         "libx264",
@@ -513,13 +494,13 @@ def create_asgi_app(flask_app) -> FastAPI:
         bitrate_kbps = coerce_stream_int(websocket.query_params.get("bitrate_kbps"), 2000, 250, 12000)
         gop = coerce_stream_int(websocket.query_params.get("gop"), max(1, int(round(fps))), 1, 240)
 
-        if platform_name != "Linux":
+        if platform_name not in {"Linux", "Windows"}:
             await websocket.send_json(
                 {
                     "type": "error",
                     "session_id": session_id,
                     "timestamp": time.time(),
-                    "error": "H.264 streaming is currently implemented only for Linux/X11 guests.",
+                    "error": f"H.264 streaming is currently implemented only for Linux/X11 and Windows guests. Current platform: {platform_name}.",
                 }
             )
             await websocket.close()
@@ -529,12 +510,13 @@ def create_asgi_app(flask_app) -> FastAPI:
         stderr_task: Optional[asyncio.Task] = None
 
         try:
-            width, height = await asyncio.to_thread(get_linux_screen_size)
+            width, height = await asyncio.to_thread(get_screen_size)
             command = build_h264_stream_command(width, height, fps, bitrate_kbps, gop)
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                creationflags=subprocess_creation_flags(),
             )
             stderr_task = asyncio.create_task(log_subprocess_stderr(process, session_id=session_id, stream_type="h264", logger=logger))
         except Exception as exc:
@@ -597,11 +579,11 @@ def create_asgi_app(flask_app) -> FastAPI:
 
     @asgi_app.get("/live/h264.mp4")
     async def live_h264_mp4(request: Request):
-        if platform_name != "Linux":
+        if platform_name not in {"Linux", "Windows"}:
             return JSONResponse(
                 status_code=400,
                 content={
-                    "error": "Browser H.264 streaming is currently implemented only for Linux/X11 guests.",
+                    "error": "Browser H.264 streaming is currently implemented only for Linux/X11 and Windows guests.",
                     "platform": platform_name,
                 },
             )
@@ -615,12 +597,13 @@ def create_asgi_app(flask_app) -> FastAPI:
             process: Optional[asyncio.subprocess.Process] = None
             stderr_task: Optional[asyncio.Task] = None
             try:
-                width, height = await asyncio.to_thread(get_linux_screen_size)
+                width, height = await asyncio.to_thread(get_screen_size)
                 command = build_fmp4_stream_command(width, height, fps, bitrate_kbps, gop)
                 process = await asyncio.create_subprocess_exec(
                     *command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
+                    creationflags=subprocess_creation_flags(),
                 )
                 stderr_task = asyncio.create_task(
                     log_subprocess_stderr(process, session_id=session_id, stream_type="fmp4", logger=logger)
