@@ -17,7 +17,7 @@ if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
 if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
 
 Write-Host "[3/4] Building one-file server executable..."
-& $PythonExe -m PyInstaller --noconfirm --clean --onefile --name main main.py
+& $PythonExe -m PyInstaller --noconfirm --clean --onefile --name main --add-data ".\h264_browser_client.html;." main.py
 Copy-Item "dist\main.exe" ".\main.exe" -Force
 
 if ($SyncDir -ne "") {
