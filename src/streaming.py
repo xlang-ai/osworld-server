@@ -7,7 +7,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.wsgi import WSGIMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
@@ -665,7 +665,10 @@ def create_asgi_app(flask_app) -> FastAPI:
         candidate_paths.append(module_base / "h264_browser_client.html")
         candidate_paths.append(Path.cwd() / "h264_browser_client.html")
 
-        client_path = next((path for path in candidate_paths if path.exists()), candidate_paths[0])
+        client_path = next((path for path in candidate_paths if path.exists()), None)
+        if client_path is None:
+            attempted_paths = ", ".join(str(path) for path in candidate_paths)
+            raise HTTPException(status_code=404, detail=f"H264 client not found. Tried: {attempted_paths}")
         return FileResponse(client_path, media_type="text/html")
 
     asgi_app.mount("/", WSGIMiddleware(flask_app))
