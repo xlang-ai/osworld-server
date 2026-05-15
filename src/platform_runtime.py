@@ -2,6 +2,7 @@ import ctypes
 import os
 import platform
 import subprocess
+import sys
 from contextlib import contextmanager
 from typing import Any, List, Tuple
 
@@ -30,6 +31,13 @@ oa_atomacos = None
 _pyautogui = None
 
 if platform_name == "Linux":
+    for distro_site_packages in (
+        "/usr/lib/python3/dist-packages",
+        f"/usr/lib/python{sys.version_info.major}.{sys.version_info.minor}/dist-packages",
+    ):
+        if os.path.isdir(distro_site_packages) and distro_site_packages not in sys.path:
+            sys.path.append(distro_site_packages)
+
     try:
         import pyatspi
         from pyatspi import Accessible, StateType, STATE_SHOWING
