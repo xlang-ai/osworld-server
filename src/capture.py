@@ -107,13 +107,16 @@ def capture_screen_image() -> Image.Image:
         return image
 
     if user_platform == "Linux":
-        pyautogui = get_pyautogui()
+        pyautogui = None
         try:
+            pyautogui = get_pyautogui()
             screenshot = pyautogui.screenshot()
         except Exception as exc:
-            logger.warning("pyautogui screenshot failed; falling back to scrot. Error: %s", exc)
+            logger.warning("pyautogui screenshot setup/capture failed; falling back to scrot. Error: %s", exc)
             screenshot = _capture_linux_screenshot_with_scrot(exc)
         try:
+            if pyautogui is None:
+                pyautogui = get_pyautogui()
             with Xcursor() as cursor_obj:
                 imgarray = cursor_obj.getCursorImageArrayFast()
             cursor_img = Image.fromarray(imgarray)
