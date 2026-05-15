@@ -36,6 +36,79 @@ def _append_event(*args, **kwargs) -> None:
     return None
 
 
+def _normalize_wallpaper_path(raw_path: str) -> Optional[str]:
+    wallpaper_path = raw_path.strip().strip("'\"")
+    if wallpaper_path.startswith("file://"):
+        wallpaper_path = wallpaper_path[len("file://") :]
+    wallpaper_path = os.path.expandvars(os.path.expanduser(wallpaper_path))
+    if wallpaper_path and os.path.exists(wallpaper_path):
+        return wallpaper_path
+    return None
+
+
+def _xfce_wallpaper_properties() -> List[str]:
+    try:
+        output = subprocess.check_output(
+            ["xfconf-query", "-c", "xfce4-desktop", "-l"],
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return []
+    return [prop.strip() for prop in output.splitlines() if prop.strip().endswith("/last-image")]
+
+
+def _get_xfce_wallpaper() -> Optional[str]:
+    for prop in _xfce_wallpaper_properties():
+        try:
+            output = subprocess.check_output(
+                ["xfconf-query", "-c", "xfce4-desktop", "-p", prop],
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            continue
+        wallpaper_path = _normalize_wallpaper_path(output)
+        if wallpaper_path:
+            return wallpaper_path
+    return None
+
+
+def _set_xfce_wallpaper(wallpaper_path: Path) -> bool:
+    props = _xfce_wallpaper_properties()
+    if not props:
+        return False
+
+    changed = False
+    for prop in props:
+        try:
+            subprocess.run(
+                ["xfconf-query", "-c", "xfce4-desktop", "-p", prop, "-s", str(wallpaper_path)],
+                check=True,
+            )
+            changed = True
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            continue
+
+        prop_prefix = prop.rsplit("/", 1)[0]
+        subprocess.run(
+            [
+                "xfconf-query",
+                "-c",
+                "xfce4-desktop",
+                "-p",
+                f"{prop_prefix}/image-style",
+                "-n",
+                "-t",
+                "int",
+                "-s",
+                "5",
+            ],
+            check=False,
+        )
+    return changed
+
+
 def register_http_routes(app: Flask) -> None:
     @app.route("/setup/execute", methods=["POST"])
     @app.route("/execute", methods=["POST"])
@@ -294,13 +367,18 @@ def register_http_routes(app: Flask) -> None:
             return output.strip().decode("utf-8")
 
         def get_wallpaper_linux():
+            xfce_wallpaper = _get_xfce_wallpaper()
+            if xfce_wallpaper:
+                return xfce_wallpaper
+
             try:
                 output = subprocess.check_output(
                     ["gsettings", "get", "org.gnome.desktop.background", "picture-uri"],
                     stderr=subprocess.PIPE,
+                    text=True,
                 )
-                return output.decode("utf-8").strip().replace("file://", "").replace("'", "")
-            except subprocess.CalledProcessError as exc:
+                return _normalize_wallpaper_path(output)
+            except (FileNotFoundError, subprocess.CalledProcessError) as exc:
                 app.logger.error("Error: %s", exc)
                 return None
 
@@ -425,7 +503,11 @@ def register_http_routes(app: Flask) -> None:
             if user_platform == "Windows":
                 ctypes.windll.user32.SystemParametersInfoW(20, 0, str(path_obj), 3)
             elif user_platform == "Linux":
-                subprocess.run(["gsettings", "set", "org.gnome.desktop.background", "picture-uri", f"file://{path_obj}"])
+                if not _set_xfce_wallpaper(path_obj):
+                    subprocess.run(
+                        ["gsettings", "set", "org.gnome.desktop.background", "picture-uri", f"file://{path_obj}"],
+                        check=True,
+                    )
             elif user_platform == "Darwin":
                 subprocess.run(["osascript", "-e", f'tell application "Finder" to set desktop picture to POSIX file "{path_obj}"'])
             return "Wallpaper changed successfully"

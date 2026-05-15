@@ -71,13 +71,35 @@ MAX_DEPTH = 50
 MAX_WIDTH = 1024
 MAX_CALLS = 5000
 
+LINUX_TERMINAL_APPLICATION_NAMES = {
+    "gnome-terminal-server",
+    "xfce4-terminal",
+    "xterm",
+}
+
+LINUX_TERMINAL_APPLICATION_XPATH_NAMES = (
+    "gnome-terminal-server",
+    "xfce4-terminal",
+    "xterm",
+    "XTerm",
+)
+
+
+def is_linux_terminal_application(app: Accessible) -> bool:
+    app_name = (getattr(app, "name", "") or "").lower()
+    return app.getRoleName() == "application" and app_name in LINUX_TERMINAL_APPLICATION_NAMES
+
 
 def has_active_terminal(desktop: Accessible) -> bool:
     for app in desktop:
-        if app.getRoleName() == "application" and app.name == "gnome-terminal-server":
+        if not is_linux_terminal_application(app):
+            continue
+        try:
             for frame in app:
                 if frame.getRoleName() == "frame" and frame.getState().contains(pyatspi.STATE_ACTIVE):
                     return True
+        except Exception:
+            continue
     return False
 
 
@@ -92,9 +114,19 @@ def get_terminal_output() -> Optional[str]:
     desktop: Accessible = pyatspi.Registry.getDesktop(0)
     if has_active_terminal(desktop):
         desktop_xml: _Element = create_atspi_node(desktop)
-        xpath = '//application[@name="gnome-terminal-server"]/frame[@st:active="true"]//terminal[@st:focused="true"]'
-        terminals: List[_Element] = desktop_xml.xpath(xpath, namespaces=accessibility_ns_map_ubuntu)
-        output = terminals[0].text.rstrip() if len(terminals) == 1 else None
+        terminal_app_predicate = " or ".join(
+            f'@name="{app_name}"' for app_name in LINUX_TERMINAL_APPLICATION_XPATH_NAMES
+        )
+        xpaths = [
+            f'//application[{terminal_app_predicate}]/frame[@st:active="true"]//terminal[@st:focused="true"]',
+            f'//application[{terminal_app_predicate}]//terminal[@st:focused="true"]',
+            f'//application[{terminal_app_predicate}]/frame[@st:active="true"]//terminal',
+        ]
+        for xpath in xpaths:
+            terminals: List[_Element] = desktop_xml.xpath(xpath, namespaces=accessibility_ns_map_ubuntu)
+            if len(terminals) == 1:
+                output = (terminals[0].text or "").rstrip()
+                break
     return output
 
 

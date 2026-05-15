@@ -5,6 +5,7 @@ import logging
 import os
 import platform
 import subprocess
+import tempfile
 import time
 from contextlib import suppress
 from typing import Any, Dict, Optional, Tuple
@@ -15,6 +16,31 @@ from .platform_runtime import DEFAULT_STREAM_FORMAT, DEFAULT_STREAM_QUALITY, get
 from .pyxcursor import Xcursor
 
 logger = logging.getLogger(__name__)
+
+
+def _capture_linux_screenshot_with_scrot(original_error: Exception) -> Image.Image:
+    tmp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp_path = tmp_file.name
+    tmp_file.close()
+    with suppress(OSError):
+        os.remove(tmp_path)
+    try:
+        subprocess.run(
+            ["scrot", "-z", tmp_path],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        with Image.open(tmp_path) as image:
+            return image.copy()
+    except Exception as scrot_error:
+        raise RuntimeError(
+            f"Failed to capture screenshot with pyautogui ({original_error}) or scrot ({scrot_error})"
+        ) from original_error
+    finally:
+        with suppress(OSError):
+            os.remove(tmp_path)
 
 
 def capture_screen_image() -> Image.Image:
@@ -82,7 +108,11 @@ def capture_screen_image() -> Image.Image:
 
     if user_platform == "Linux":
         pyautogui = get_pyautogui()
-        screenshot = pyautogui.screenshot()
+        try:
+            screenshot = pyautogui.screenshot()
+        except Exception as exc:
+            logger.warning("pyautogui screenshot failed; falling back to scrot. Error: %s", exc)
+            screenshot = _capture_linux_screenshot_with_scrot(exc)
         try:
             with Xcursor() as cursor_obj:
                 imgarray = cursor_obj.getCursorImageArrayFast()
