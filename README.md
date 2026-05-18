@@ -11,29 +11,29 @@ The following sections contain guidelines for configuring the system image to en
 The main configuration requirements include:
 
 1. **Account Credentials**: 
-Our benchmark configurations are based on specific username and password settings (with username `user` and password `password`). 
+Our benchmark configurations are based on specific username and password settings (with username `user` and password `osworld-public-evaluation`). 
 Please ensure these settings remain consistent or update the corresponding configuration files.
 
-2. **Service Setup**: 
+1. **Service Setup**: 
 Our environment operates through a service that automatically starts at boot time, as shown in the figure below. The service needs to be properly configured and placed.
 ![](https://os-world.github.io/static/images/env.png)
 
-3. **Accessibility Tree Support**:  
+1. **Accessibility Tree Support**:  
 Benchmark examples rely on accessibility tree functionality. The necessary support packages need to be installed.
 
-4. **System Service Management**:  
+1. **System Service Management**:  
 Certain system services that may cause interference need to be disabled, such as automatic updates and notification pop-ups.
 
-5. **Required Software Installation**:  
+1. **Required Software Installation**:  
 Ensure all necessary software packages required by the benchmark examples are properly installed.
 
-6. **Software Configuration**: 
+1. **Software Configuration**: 
 Various software packages require specific configurations, such as disabling certain auto-save features or installing additional plugins.
 
-7. **Port Configuration**: 
+1. **Port Configuration**: 
 To monitor and control software states from the host machine, specific port configurations are needed for various applications.
 
-8. **Miscellaneous Settings**: 
+1. **Miscellaneous Settings**: 
 Additional system-specific settings need to be configured, such as desktop environment settings and display resolution.
 
 Detailed instructions for each of these requirements will be provided in the following sections.
@@ -75,7 +75,7 @@ sudo systemctl set-default graphical.target
 Download the iso file from the [Ubuntu website](https://ubuntu.com/download/alternative-downloads) and install it in the VM. 
 
 Using GUI:
-The default username should be `user` and the password should be `password` when you are asked to set up the account. Give the user sudo permission.
+The default username should be `user` and the password should be `osworld-public-evaluation` when you are asked to set up the account. Give the user sudo permission.
 
 Using Command Line:
 ```bash
@@ -86,7 +86,7 @@ usermod -aG sudo user
 ### Installation and Auto-login Setup
 
 1. Download the iso file from the [Ubuntu website](https://ubuntu.com/download/alternative-downloads) and install it in the VM. 
-The default username should be `user` and the password should be `password` when you are asked to set up the account.
+The default username should be `user` and the password should be `osworld-public-evaluation` when you are asked to set up the account.
 
 2. To enable automatic login:
 
