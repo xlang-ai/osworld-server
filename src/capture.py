@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import platform
+import shutil
 import subprocess
 import tempfile
 import time
@@ -18,29 +19,70 @@ from .pyxcursor import Xcursor
 logger = logging.getLogger(__name__)
 
 
-def _capture_linux_screenshot_with_scrot(original_error: Exception) -> Image.Image:
+def _capture_linux_screenshot_with_subprocess(timeout_seconds: float = 8.0) -> Image.Image:
+    """Capture Linux screenshots outside this long-lived server process.
+
+    Xlib fatal errors can terminate the current process before Python exception
+    handling runs. Keeping screenshot capture in a child process prevents one bad
+    X request from taking down the OSWorld HTTP server.
+    """
     tmp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
     tmp_path = tmp_file.name
     tmp_file.close()
     with suppress(OSError):
         os.remove(tmp_path)
+
+    commands = []
+    if shutil.which("gnome-screenshot"):
+        commands.append(["gnome-screenshot", "-p", "-f", tmp_path])
+    if shutil.which("scrot"):
+        commands.append(["scrot", "-p", "-z", tmp_path])
+        commands.append(["scrot", "-z", tmp_path])
+    if not commands:
+        raise RuntimeError("No out-of-process screenshot tool found; install gnome-screenshot or scrot")
+
+    errors = []
     try:
-        subprocess.run(
-            ["scrot", "-z", tmp_path],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        with Image.open(tmp_path) as image:
-            return image.copy()
-    except Exception as scrot_error:
-        raise RuntimeError(
-            f"Failed to capture screenshot with pyautogui ({original_error}) or scrot ({scrot_error})"
-        ) from original_error
+        for command in commands:
+            with suppress(OSError):
+                os.remove(tmp_path)
+            try:
+                subprocess.run(
+                    command,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout_seconds,
+                )
+                if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) <= 0:
+                    errors.append(f"{command[0]} produced no screenshot")
+                    continue
+                with Image.open(tmp_path) as image:
+                    return image.copy()
+            except Exception as exc:
+                errors.append(f"{' '.join(command)}: {exc}")
+        raise RuntimeError("Failed to capture screenshot out-of-process: " + " | ".join(errors))
     finally:
         with suppress(OSError):
             os.remove(tmp_path)
+
+
+def _capture_linux_screenshot_with_pyautogui() -> Image.Image:
+    pyautogui = get_pyautogui()
+    screenshot = pyautogui.screenshot()
+    try:
+        with Xcursor() as cursor_obj:
+            imgarray = cursor_obj.getCursorImageArrayFast()
+        cursor_img = Image.fromarray(imgarray)
+        cursor_x, cursor_y = pyautogui.position()
+        screenshot.paste(cursor_img, (cursor_x, cursor_y), cursor_img)
+    except Exception as exc:
+        logger.warning(
+            "Failed to capture cursor on Linux, screenshot will not have a cursor. Error: %s",
+            exc,
+        )
+    return screenshot
 
 
 def capture_screen_image() -> Image.Image:
@@ -107,27 +149,9 @@ def capture_screen_image() -> Image.Image:
         return image
 
     if user_platform == "Linux":
-        pyautogui = None
-        try:
-            pyautogui = get_pyautogui()
-            screenshot = pyautogui.screenshot()
-        except Exception as exc:
-            logger.warning("pyautogui screenshot setup/capture failed; falling back to scrot. Error: %s", exc)
-            screenshot = _capture_linux_screenshot_with_scrot(exc)
-        try:
-            if pyautogui is None:
-                pyautogui = get_pyautogui()
-            with Xcursor() as cursor_obj:
-                imgarray = cursor_obj.getCursorImageArrayFast()
-            cursor_img = Image.fromarray(imgarray)
-            cursor_x, cursor_y = pyautogui.position()
-            screenshot.paste(cursor_img, (cursor_x, cursor_y), cursor_img)
-        except Exception as exc:
-            logger.warning(
-                "Failed to capture cursor on Linux, screenshot will not have a cursor. Error: %s",
-                exc,
-            )
-        return screenshot
+        if os.environ.get("OSWORLD_ALLOW_IN_PROCESS_X11_CAPTURE") == "1":
+            return _capture_linux_screenshot_with_pyautogui()
+        return _capture_linux_screenshot_with_subprocess()
 
     if user_platform == "Darwin":
         import tempfile

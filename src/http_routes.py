@@ -277,9 +277,13 @@ def register_http_routes(app: Flask) -> None:
 
     @app.route("/screenshot", methods=["GET"])
     def capture_screen_with_cursor():
-        image = capture_screen_image()
-        image_bytes, _ = encode_image_bytes(image, image_format="PNG")
-        return send_file(io.BytesIO(image_bytes), mimetype="image/png", download_name="screenshot.png")
+        try:
+            image = capture_screen_image()
+            image_bytes, _ = encode_image_bytes(image, image_format="PNG")
+            return send_file(io.BytesIO(image_bytes), mimetype="image/png", download_name="screenshot.png")
+        except Exception as exc:
+            app.logger.error("Failed to capture screenshot: %s", exc)
+            return jsonify({"status": "error", "message": str(exc)}), 503
 
     @app.route("/terminal", methods=["GET"])
     def terminal_output():
