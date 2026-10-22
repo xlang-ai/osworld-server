@@ -18,6 +18,7 @@ from flask import Flask, abort, jsonify, request, send_file
 
 from .accessibility import build_accessibility_tree, get_terminal_output
 from .capture import capture_screen_image, encode_image_bytes
+from .desktop_session import desktop_session_environment
 from .platform_runtime import (
     TIMEOUT,
     build_ffmpeg_capture_input_args,
@@ -135,6 +136,7 @@ def register_http_routes(app: Flask) -> None:
                 text=True,
                 timeout=timeout,
                 creationflags=flags,
+                env=desktop_session_environment(logger=app.logger),
             )
             return jsonify(
                 {
@@ -174,6 +176,7 @@ def register_http_routes(app: Flask) -> None:
                 text=True,
                 timeout=120,
                 creationflags=flags,
+                env=desktop_session_environment(logger=app.logger),
             )
 
             if not verification:
@@ -270,7 +273,9 @@ def register_http_routes(app: Flask) -> None:
             if "google-chrome" in command and get_machine_architecture() == "arm":
                 index = command.index("google-chrome")
                 command[index] = "chromium"
-            subprocess.Popen(command, shell=shell)
+            subprocess.Popen(
+                command, shell=shell, env=desktop_session_environment(logger=app.logger)
+            )
             return f"{command if shell else ' '.join(command)} launched successfully"
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
